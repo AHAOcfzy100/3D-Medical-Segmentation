@@ -189,7 +189,10 @@ def train():
     # 初始化Dice损失函数
     # DiceLoss(2): 创建一个Dice损失函数实例，参数2可能表示类别数
     # .cuda(): 将损失函数移到GPU上
-    criterion_dice = DiceLoss(2).cuda()
+    """
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!这里改了代码，数字本来是2改成了1，感觉像是分类数！！！！！！！
+    """
+    criterion_dice = DiceLoss(1).cuda()
     # 初始化交叉熵损失函数
     # CrossEntropyLoss(): 创建交叉熵损失函数实例
     # .cuda(): 将损失函数移到GPU上
@@ -312,6 +315,9 @@ def train():
             # permute(0,4,1,2,3)：调整维度顺序以匹配输出格式
             model_output_one_hot = torch.nn.functional.one_hot(labels, num_classes=hp.out_class+1).permute(0,4,1,2,3)
 
+            print("outputs shape:", outputs.shape)  # 预期 (B, C, D, H, W)
+            print("y shape:", y.shape)  # 预期 (B, C, D, H, W)
+            print("y.argmax shape:", y.argmax(dim=1).shape)  # 预期 (B, D, H, W)
             # 计算损失函数
             # criterion_ce：交叉熵损失
             # criterion_dice：Dice 损失
@@ -319,7 +325,7 @@ def train():
             loss = criterion_ce(outputs, y.argmax(dim=1)) + criterion_dice(outputs, y.argmax(dim=1))
             # loss = criterion_ce(outputs, y) + criterion_dice(outputs, y.argmax(dim=1).unsqueeze(1))
             # loss = criterion_ce(outputs, y.argmax(dim=1)) + criterion_dice(outputs, y.argmax(dim=1).unsqueeze(1))
-
+            # loss = criterion_ce(outputs, y.argmax(dim=1)) + criterion_dice(outputs, y)  # 修改此处
 
 
             # logits = torch.sigmoid(outputs)

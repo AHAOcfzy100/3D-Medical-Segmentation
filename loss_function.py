@@ -122,12 +122,16 @@ class DiceLoss(nn.Module):
         return loss
 
     def forward(self, inputs, target, weight=None, softmax=False):
-        if softmax:
+        if target.dim() == inputs.dim() - 1:  # 如果 target 是类别索引
+            target = torch.nn.functional.one_hot(target, num_classes=inputs.shape[1]).permute(0, 4, 1, 2, 3)
+        elif softmax:
             inputs = torch.softmax(inputs, dim=1)
         target = self._one_hot_encoder(target)
         if weight is None:
             weight = [1] * self.n_classes
         # target.reshape([2, 2, 32, 32, 32])
+        print("inputs shape:", inputs.shape)
+        print("target shape:", target.shape)
         assert inputs.size() == target.size(), 'predict & target shape do not match'
         class_wise_dice = []
         loss = 0.0
