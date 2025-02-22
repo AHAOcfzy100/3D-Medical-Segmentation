@@ -73,20 +73,23 @@ def parse_training_args(parser):
 
 
 def train():
-
+    # 创建参数解析器，并设置描述信息
     parser = argparse.ArgumentParser(description='PyTorch Medical Segmentation Training')
+    # 调用自定义函数添加训练相关参数
     parser = parse_training_args(parser)
+    # 初步解析已知参数（允许存在未定义的参数），返回已解析参数和未解析参数列表
     args, _ = parser.parse_known_args()
-
+    # 再次完整解析所有参数（会覆盖之前的args变量）
     args = parser.parse_args()
 
-
+    # 设置PyTorch的cuDNN后端配置
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.enabled = args.cudnn_enabled
     torch.backends.cudnn.benchmark = args.cudnn_benchmark
 
-
+    # 延迟导入数据模块（可能需要先解析某些路径参数）
     from data_function import MedData_train
+    # 创建输出目录（如果不存在）
     os.makedirs(args.output_dir, exist_ok=True)
 
     if hp.mode == '2d':
@@ -112,10 +115,13 @@ def train():
         #model = PSPNet(in_class=hp.in_class,n_classes=hp.out_class+1)
 
     elif hp.mode == '3d':
+        # 从three_d子模块导入标准的3D U-Net实现
         #from models.three_d.unet3d import UNet3D
         #model = UNet3D(in_channels=hp.in_class, out_channels=hp.out_class+1, init_features=32)
 
+        # 当前使用的带残差连接的3D U-Net变体
         from models.three_d.residual_unet3d import UNet
+        # 实例化残差U-Net模型
         model = UNet(in_channels=hp.in_class, n_classes=hp.out_class+1, base_n_filter=2)
 
         #from models.three_d.fcn3d import FCN_Net
@@ -136,13 +142,20 @@ def train():
         #from models.three_d.unetr import UNETR
         #model = UNETR(img_shape=(hp.crop_or_pad_size), input_dim=hp.in_class, output_dim=hp.out_class+1)
 
-
-
+    # 将模型包装为DataParallel，实现多GPU并行计算
+    # device_ids参数指定使用的GPU设备列表
     model = torch.nn.DataParallel(model, device_ids=devicess)
+    # 定义优化器，使用Adam算法
+    # model.parameters()获取模型所有可训练参数
+    # lr=args.init_lr设置初始学习率，从命令行参数中获取
     optimizer = torch.optim.Adam(model.parameters(), lr=args.init_lr)
 
-
+    # （注释掉的学习率调度器1：基于验证损失的动态调整）
     # scheduler = ReduceLROnPlateau(optimizer, 'min',factor=0.5, patience=20, verbose=True)
+    # 当前使用的学习率调度器：StepLR
+    # 按固定步长调整学习率
+    # step_size=hp.scheduer_step_size：从超参数中获取调整步长（单位：epoch）
+    # gamma=hp.scheduer_gamma：从超参数中获取学习率衰减系数
     scheduler = StepLR(optimizer, step_size=hp.scheduer_step_size, gamma=hp.scheduer_gamma)
     # scheduler = CosineAnnealingLR(optimizer, T_max=50, eta_min=5e-6)
 
@@ -164,28 +177,57 @@ def train():
     else:
         elapsed_epochs = 0
 
+    # 将模型移动到GPU上运行
     model.cuda()
 
+    # 导入损失函数模块
+    # Binary_Loss: 自定义的二元分类损失函数
+    # DiceLoss: 自定义的Dice损失函数，常用于医学图像分割
     from loss_function import Binary_Loss,DiceLoss
+    # 导入PyTorch内置的交叉熵损失函数
     from torch.nn.modules.loss import CrossEntropyLoss
+    # 初始化Dice损失函数
+    # DiceLoss(2): 创建一个Dice损失函数实例，参数2可能表示类别数
+    # .cuda(): 将损失函数移到GPU上
     criterion_dice = DiceLoss(2).cuda()
+    # 初始化交叉熵损失函数
+    # CrossEntropyLoss(): 创建交叉熵损失函数实例
+    # .cuda(): 将损失函数移到GPU上
     criterion_ce = CrossEntropyLoss().cuda()
 
-
+    # 创建TensorBoard日志记录器
+    # SummaryWriter: PyTorch提供的可视化工具接口
+    # args.output_dir: 日志保存路径，从命令行参数中获取
     writer = SummaryWriter(args.output_dir)
 
-
-
+    # 创建训练数据集实例
+    # MedData_train: 自定义的医学图像数据集类
+    # source_train_dir: 训练图像数据目录
+    # label_train_dir: 对应的标签数据目录
     train_dataset = MedData_train(source_train_dir,label_train_dir)
+    # 创建数据加载器
+    # train_dataset.queue_dataset: 获取数据集的可迭代对象
+    # batch_size=args.batch: 从命令行参数中获取批量大小
+    # shuffle=True: 每个epoch打乱数据顺序
+    # pin_memory=True: 将数据加载到CUDA固定内存中，加速GPU传输
+    # drop_last=True: 丢弃最后一个不完整的batch
     train_loader = DataLoader(train_dataset.queue_dataset, 
                             batch_size=args.batch, 
                             shuffle=True,
                             pin_memory=True,
                             drop_last=True)
 
+    # 将模型设置为训练模式
+    # 启用dropout和batch normalization等训练特定行为
     model.train()
 
+    # 计算剩余训练轮数
+    # args.epochs: 总训练轮数
+    # elapsed_epochs: 已完成的训练轮数
     epochs = args.epochs - elapsed_epochs
+    # 计算当前迭代次数
+    # len(train_loader): 每个epoch的迭代次数（batch数量）
+    # elapsed_epochs * len(train_loader): 已完成的迭代次数
     iteration = elapsed_epochs * len(train_loader)
 
 
@@ -258,6 +300,8 @@ def train():
 
 
             loss = criterion_ce(outputs, y.argmax(dim=1)) + criterion_dice(outputs, y.argmax(dim=1))
+            # loss = criterion_ce(outputs, y) + criterion_dice(outputs, y.argmax(dim=1).unsqueeze(1))
+            # loss = criterion_ce(outputs, y.argmax(dim=1)) + criterion_dice(outputs, y.argmax(dim=1).unsqueeze(1))
 
 
 

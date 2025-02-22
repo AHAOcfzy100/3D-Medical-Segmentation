@@ -127,6 +127,7 @@ class DiceLoss(nn.Module):
         target = self._one_hot_encoder(target)
         if weight is None:
             weight = [1] * self.n_classes
+        # target.reshape([2, 2, 32, 32, 32])
         assert inputs.size() == target.size(), 'predict & target shape do not match'
         class_wise_dice = []
         loss = 0.0

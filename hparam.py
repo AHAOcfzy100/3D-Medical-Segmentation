@@ -1,7 +1,7 @@
 class hparams:
 
     train_or_test = 'train'
-    output_dir = 'logs/your_program_name'
+    output_dir = 'logs/3d_seg'
     aug = None
     latest_checkpoint_file = 'checkpoint_latest.pt'
     total_epochs = 100
@@ -22,14 +22,16 @@ class hparams:
     # for test
     patch_overlap = 4,4,4 # if 2D: 4,4,0
 
-    fold_arch = '*.mhd'
+    # fold_arch = '*.mhd'
+    fold_arch = '*.nii.gz'
+
 
     save_arch = '.nii.gz'
 
-    source_train_dir = 'train/image'
-    label_train_dir = 'train/label'
-    source_test_dir = 'test/image'
-    label_test_dir = 'test/label'
+    source_train_dir = 'E:\\xgh\\nnunet\\nnunet\\nnUNet\\DATSET\\nnUNet_raw\\Dataset002_Heart\\imagesTr'
+    label_train_dir = 'E:\\xgh\\nnunet\\nnunet\\nnUNet\\DATSET\\nnUNet_raw\\Dataset002_Heart\\labelsTr'
+    source_test_dir = 'E:\\xgh\\nnunet\\nnunet\\nnUNet\\DATSET\\nnUNet_raw\\Dataset002_Heart\\imagesTs'
+    label_test_dir = 'E:\\xgh\\nnunet\\nnunet\\nnUNet\\DATSET\\nnUNet_raw\\Dataset002_Heart\\imagesTs_predlowres'
 
 
-    output_dir_test = 'results/your_program_name'
+    output_dir_test = 'results/3d_seg'
